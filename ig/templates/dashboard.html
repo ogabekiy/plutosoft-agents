@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="dashboard-csrf" content="{{ csrf_token }}">
+  <title>Inbox · PlutoSoft</title>
+  <link rel="stylesheet" href="{{ url_for('dashboard.static', filename='dashboard.css') }}">
+</head>
+<body class="inbox-page">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="/dashboard" aria-label="PlutoSoft Inbox bosh sahifa">
+        <span class="brand-mark">P</span>
+        <span>pluto<span class="brand-soft">soft</span><small>UNIFIED INBOX</small></span>
+      </a>
+      <div class="workspace-label">WORKSPACE</div>
+      <div class="workspace-card"><span class="workspace-avatar">P</span><span>PlutoSoft<small>Customer care</small></span><span class="workspace-chevron">⌄</span></div>
+      <div class="nav-section-label">INBOX</div>
+      <nav class="channel-nav" aria-label="Kanal bo'yicha filter">
+        <button class="nav-item is-active" data-platform="all"><span class="nav-icon all-icon">✳</span><span>Barcha suhbatlar</span><span class="nav-count" id="total-count">0</span></button>
+        <button class="nav-item" data-platform="Instagram"><span class="channel-icon instagram-icon">◎</span><span>Instagram</span><span class="nav-count" id="ig-count">0</span></button>
+        <button class="nav-item" data-platform="Telegram"><span class="channel-icon telegram-icon">➤</span><span>Telegram</span><span class="nav-count" id="tg-count">0</span></button>
+        <div class="nav-section-label nav-section-leads">MIJOZLAR</div>
+        <button class="nav-item leads-nav-item" data-view="leads"><span class="nav-icon leads-icon">♧</span><span>Leadlar</span><span class="nav-count" id="leads-count">0</span></button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="connection-card"><span class="connection-dot"></span><span>Kanallar faol<small>Jonli kuzatuv yoqilgan</small></span><span class="pulse-ring"></span></div>
+        <div class="sidebar-user"><div class="user-avatar">PS</div><span>PlutoSoft Admin<small>Workspace owner</small></span>
+          <form method="post" action="{{ url_for('dashboard.logout') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="logout-button" type="submit" aria-label="Chiqish" title="Chiqish">↗</button>
+          </form>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div><p class="eyebrow">MIJOZLAR BILAN ALOQA</p><h1>Unified inbox <span class="live-pill"><i></i> LIVE</span></h1></div>
+        <div class="topbar-right">
+          <label class="model-setting">Claude modeli
+            <select id="model-select" aria-label="Claude modelini tanlang" disabled>
+              <option value="claude-haiku-5-5">Haiku 5.5</option>
+              <option value="claude-sonnet-5-5">Sonnet 5.5</option>
+              <option value="claude-opus-5-5">Opus 5.5</option>
+            </select>
+          </label>
+          <span id="model-status" class="model-status" role="status" aria-live="polite"></span>
+          <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Yorug' rejimga o'tish" title="Yorug' rejim">☼</button>
+          <div class="live-update"><span class="live-dot"></span> Avtomatik yangilanadi</div><div class="top-avatar">PS</div>
+        </div>
+      </header>
+
+      <section class="stats-grid" aria-label="Inbox statistikasi">
+        <article class="stat-card"><div class="stat-top"><span>Jami suhbatlar</span><span class="stat-icon stat-purple">✳</span></div><strong id="stat-total">0</strong><small>ikkala kanalda</small><div class="stat-spark spark-purple"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article>
+        <article class="stat-card"><div class="stat-top"><span>Instagram</span><span class="channel-icon instagram-icon">◎</span></div><strong id="stat-instagram">0</strong><small>faol suhbatlar</small><div class="stat-spark spark-pink"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article>
+        <article class="stat-card"><div class="stat-top"><span>Telegram</span><span class="channel-icon telegram-icon">➤</span></div><strong id="stat-telegram">0</strong><small>faol suhbatlar</small><div class="stat-spark spark-blue"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article>
+        <article class="stat-card"><div class="stat-top"><span>Ko'rilgan xabarlar</span><span class="stat-icon stat-green">↗</span></div><strong id="stat-messages">0</strong><small>saqlangan xabarlar</small><div class="stat-spark spark-green"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article>
+      </section>
+
+      <section class="inbox-panel">
+        <div class="inbox-toolbar">
+          <div><h2>Suhbatlar</h2><p>Barcha kanallardagi xabarlar</p></div>
+          <label class="search-box"><span>⌕</span><input id="search" type="search" placeholder="Ism yoki xabar qidirish..." autocomplete="off"><kbd>⌘ K</kbd></label>
+        </div>
+        <div class="inbox-body">
+          <section class="conversation-column" aria-label="Suhbatlar ro'yxati">
+            <div class="list-header"><span id="list-label">BARCHASI</span><span class="sort-label">ENG YANGI ↓</span></div>
+            <div id="conversation-list" class="conversation-list"><div class="loading-state"><span class="loader"></span><span>Suhbatlar yuklanmoqda...</span></div></div>
+          </section>
+          <section class="chat-column" aria-label="Tanlangan suhbat">
+            <div id="empty-chat" class="empty-chat"><div class="empty-art"><span>✳</span><i></i><b></b></div><h3>Suhbatni tanlang</h3><p>Mijoz xabarlarini ko'rish uchun<br>chap tomondan suhbatni oching.</p></div>
+            <div id="chat-view" class="chat-view hidden">
+              <header class="chat-header"><div id="chat-avatar" class="conversation-avatar">?</div><div class="chat-contact"><strong id="chat-name">Mijoz</strong><span id="chat-meta">—</span></div><span id="chat-channel" class="channel-badge">—</span><button id="refresh-button" class="refresh-button" title="Yangilash" aria-label="Suhbatni yangilash">↻</button></header>
+              <div class="thread-info"><span class="thread-lock">✳</span><span>Bu suhbat <b id="thread-platform">—</b> orqali kelgan</span><span class="thread-line"></span></div>
+              <div id="message-list" class="message-list"><div class="loading-state"><span class="loader"></span></div></div>
+              <div id="send-error" class="send-error hidden" role="alert"></div>
+              <form id="reply-form" class="reply-form">
+                <textarea id="reply-input" rows="1" maxlength="4096" placeholder="Javob yozing..." aria-label="Javob matni" required></textarea>
+                <div class="reply-controls"><span>Enter — yuborish · Shift + Enter — yangi qator</span><button id="send-button" type="submit"><span>Yuborish</span><b>↑</b></button></div>
+              </form>
+              <footer class="chat-footer"><span class="footer-spark">✦</span><span>Xabarlar avtomatik sinxronlanadi</span><span class="sync-status"><i></i> Sinxron</span></footer>
+            </div>
+          </section>
+        </div>
+      </section>
+      <section id="leads-panel" class="leads-panel hidden">
+        <div class="inbox-toolbar">
+          <div><h2>Leadlar</h2><p>Mijozlardan yig'ilgan murojaatlar</p></div>
+          <label class="search-box"><span>⌕</span><input id="lead-search" type="search" placeholder="Ism, telefon yoki xabar..." autocomplete="off"></label>
+        </div>
+        <div class="leads-table-wrap">
+          <table class="leads-table">
+            <thead><tr><th>MIJOZ</th><th>TELEFON</th><th>KANAL</th><th>QO'SHIMCHA XABAR</th><th>SUHBAT XULOSASI</th><th>VAQT</th><th>TELEGRAM</th></tr></thead>
+            <tbody id="leads-list"></tbody>
+          </table>
+          <div id="leads-empty" class="list-empty">Hozircha leadlar yo'q. Mijozdan kontakt ma'lumotlari yig'ilganda shu yerda ko'rinadi.</div>
+        </div>
+      </section>
+      <footer class="page-footer"><span>PlutoSoft Inbox</span><span>Ma'lumotlar lokal saqlanadi · {{ db_path }}</span></footer>
+    </main>
+  </div>
+  <script src="{{ url_for('dashboard.static', filename='dashboard.js') }}" defer></script>
+</body>
+</html>

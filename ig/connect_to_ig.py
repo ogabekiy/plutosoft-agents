@@ -24,7 +24,7 @@ import hmac
 import logging
 
 import sys
-
+from datetime import datetime, timedelta, timezone
 from concurrent.futures import ThreadPoolExecutor
 
 from pathlib import Path
@@ -36,6 +36,7 @@ import requests
 from dotenv import load_dotenv, set_key
 
 from flask import Flask, redirect, request, session, jsonify
+from cl import chat_store
 
 
 
@@ -71,7 +72,16 @@ message_executor = ThreadPoolExecutor(max_workers=4)
 
 app = Flask(__name__)
 
-app.secret_key = secrets.token_hex(16)
+app.secret_key = os.getenv("DASHBOARD_SECRET_KEY") or secrets.token_hex(32)
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+)
+
+from ig.dashboard import dashboard
+
+app.register_blueprint(dashboard)
 
 
 
@@ -79,7 +89,10 @@ app.secret_key = secrets.token_hex(16)
 
 @app.get("/")
 def index():
-    return '<a href="/instagram/connect"><button>Instagram bilan davom etish</button></a>'
+    return (
+        '<a href="/instagram/connect"><button>Instagram bilan davom etish</button></a> '
+        '<a href="/dashboard">Inbox dashboard</a>'
+    )
 
 
 @app.get("/instagram/webhook")
@@ -433,11 +446,77 @@ def send_instagram_message(recipient_id: str, text: str) -> None:
         response.raise_for_status()
 
 
-def handle_incoming_message(recipient_id: str, text: str) -> None:
+def handle_incoming_message(
+    recipient_id: str,
+    text: str,
+    message_key: str | None = None,
+) -> None:
 
     if str(PROJECT_ROOT) not in sys.path:
 
         sys.path.insert(0, str(PROJECT_ROOT))
+
+    cached_profile = chat_store.get_profile("Instagram", recipient_id)
+    profile_name = (
+        cached_profile["display_name"]
+        if cached_profile
+        else f"Instagram user {recipient_id}"
+    )
+    username = cached_profile.get("username") if cached_profile else None
+    profile_url = cached_profile.get("profile_url") if cached_profile else None
+    profile_is_stale = (
+        cached_profile is None
+        or datetime.now(timezone.utc)
+        - datetime.fromisoformat(cached_profile["updated_at"])
+        > timedelta(days=3)
+    )
+    profile_lookup_succeeded = False
+    if IG_ACCESS_TOKEN and profile_is_stale:
+        try:
+            profile_response = requests.get(
+                f"{GRAPH_API_URL}/{recipient_id}",
+                params={
+                    "fields": "name,username,profile_pic",
+                },
+                headers={"Authorization": f"Bearer {IG_ACCESS_TOKEN}"},
+                timeout=10,
+            )
+            profile_response.raise_for_status()
+            profile = profile_response.json()
+            if isinstance(profile, dict) and any(
+                field in profile for field in ("name", "username", "profile_pic")
+            ):
+                profile_lookup_succeeded = True
+                username = profile.get("username") or username
+                profile_name = (
+                    profile.get("name")
+                    or (f"@{username}" if username else None)
+                    or profile_name
+                )
+                profile_url = profile.get("profile_pic") or profile_url
+        except (requests.RequestException, ValueError):
+            logger.warning(
+                "Instagram profile details were unavailable for user %s.",
+                recipient_id,
+                exc_info=True,
+            )
+    if cached_profile is None or profile_lookup_succeeded:
+        chat_store.update_profile(
+            platform="Instagram",
+            external_id=recipient_id,
+            display_name=profile_name,
+            username=username if isinstance(username, str) else None,
+            profile_url=profile_url if isinstance(profile_url, str) else None,
+        )
+
+    chat_store.record_message(
+        platform="Instagram",
+        external_id=recipient_id,
+        display_name=profile_name,
+        role="customer",
+        text=text,
+        message_key=message_key,
+    )
 
     from cl.send_leads import LEAD_PROMPT, handle_lead_message
 
@@ -449,6 +528,13 @@ def handle_incoming_message(recipient_id: str, text: str) -> None:
     if handled:
         if lead_reply:
             send_instagram_message(recipient_id, lead_reply)
+            chat_store.record_message(
+                platform="Instagram",
+                external_id=recipient_id,
+                display_name="PlutoSoft AI",
+                role="assistant",
+                text=lead_reply,
+            )
         return
 
     from chat_with_claude import generate_answer
@@ -456,7 +542,15 @@ def handle_incoming_message(recipient_id: str, text: str) -> None:
     answer = generate_answer(text)
     reply_parts = [part for part in (answer, LEAD_PROMPT if started else "") if part]
     if reply_parts:
-        send_instagram_message(recipient_id, "\n\n".join(reply_parts))
+        reply = "\n\n".join(reply_parts)
+        send_instagram_message(recipient_id, reply)
+        chat_store.record_message(
+            platform="Instagram",
+            external_id=recipient_id,
+            display_name="PlutoSoft AI",
+            role="assistant",
+            text=reply,
+        )
 
 
 
@@ -514,6 +608,7 @@ def receive_instagram_webhook():
             sender_id = event.get("sender", {}).get("id")
 
             text = message.get("text")
+            message_key = message.get("mid")
 
 
 
@@ -534,6 +629,7 @@ def receive_instagram_webhook():
                     str(sender_id),
 
                     text,
+                    f"{sender_id}:{message_key}" if message_key else None,
 
                 )
 

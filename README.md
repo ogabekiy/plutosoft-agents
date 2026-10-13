@@ -1,139 +1,149 @@
 # PlutoSoft AI Assistant
 
-Bu loyiha PlutoSoft kompaniyasi haqida ma'lumot beradigan AI chat assistant bo'lib, foydalanuvchining savollariga kontekstga asoslangan javob qaytaradi. Asosiy maqsad: kompaniya haqida mavjud ma'lumotlarni tez, aniq va doimiy tarzda taqdim etish.
+Loyiha PlutoSoft xizmatlari haqida savollarga javob beradigan AI yordamchi va mijozlar inboxini birlashtiradi. Agent savolga mos ma'lumotlarni lokal vektor bazasidan qidirib, Claude orqali o'zbek tilida javob yaratadi. Mijozlar Telegram yoki Instagram Direct'dan yozishi, operator esa dashboard'dan suhbatni ko'rib javob berishi mumkin.
 
-## Loyihaning hozirgi holati
+## Ishlatilgan texnologiyalar
 
-Loyiha hozirgi bosqichida Python asosidagi lokal RAG (Retrieval-Augmented Generation) ilova sifatida ishlamoqda. U quyidagi jarayonlarni bajaradi:
+- **Python** — agent, botlar va webhook serverining asosiy tili.
+- **Anthropic Claude API** — mijoz savollariga javob va lead suhbatining qisqa xulosasini yaratadi.
+- **SentenceTransformers** — savol va hujjatlarni embeddingga aylantirib, matnni mazmuni bo'yicha qidirishga yordam beradi. Model: `paraphrase-multilingual-MiniLM-L12-v2`.
+- **ChromaDB** — embedding va manba matnlarini lokal vektor bazasida saqlaydi va qidiradi.
+- **Flask** — Instagram webhook hamda inbox dashboard backend'i.
+- **Telegram Bot API** — long polling orqali mijoz xabarlarini qabul qilish va javob yuborish.
+- **SQLite** — xabarlar, profil va leadlarni `conversation_history.sqlite3` faylida saqlaydi.
+- **python-dotenv** — maxfiy kalitlar va sozlamalarni `.env` faylidan o'qiydi; dashboard'dan model tanlanganda `CLAUDE_MODEL` ni shu faylga yozadi.
+- **HTML, CSS va JavaScript** — dashboard interfeysi, dark/light rejim va suhbatlarni boshqarish.
 
-- Savolni qabul qiladi
-- Matnlarni vektor embeddingga aylantiradi
-- ChromaDB ichidagi ma'lumotlar bazasidan eng mos chunklarni topadi
-- Topilgan kontekstni Claude modeli bilan birlashtirib javob yaratadi
-- Foydalanuvchiga O'zbek tilida tabiiy va qisqa javob beradi
+## Talablar
 
-## Asosiy texnologiyalar
+- Python 3
+- Claude API ishlatish uchun Anthropic API kaliti
+- Telegram ishlatish uchun BotFather'dan olingan bot tokeni
+- Instagram ishlatish uchun Meta Developer app, professional Instagram akkaunti va public HTTPS tunnel (masalan, ngrok)
 
-### 1. Python
-Python loyiha asosiy tilidir. Bu yerda CLI interfeys, RAG pipeline, embedding va API ishlash logikasi yozilgan.
+## O'rnatish
 
-### 2. Anthropic SDK
-`anthropic` paketidan foydalanilgan. Claude modeli API orqali chaqiriladi. U savolga javob berishda asosiy generativ qism vazifasini bajaradi.
+Loyiha ildizidan virtual muhit yarating va kerakli Python paketlarini o'rnating:
 
-### 3. SentenceTransformers
-`sentence-transformers` modeli ishlatilgan. U savollar va ma'lumotlar chunklarini vektor ko'rinishga o'tkazadi. Bu orqali semantik qidiruv (semantic search) amalga oshiriladi.
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install anthropic chromadb sentence-transformers flask requests python-dotenv
+cp .env.example .env
+```
 
-### 4. ChromaDB
-ChromaDB lokal vektor bazasi sifatida ishlatilgan. Bu yerda ma'lumotlar chunklari saqlanadi va savolga mos keladigan ma'lumotlar topiladi.
+Windows PowerShell'da virtual muhitni faollashtirish:
 
-### 5. python-dotenv
-`.env` fayldan konfiguratsiya qiymatlarini yuklash uchun `python-dotenv` ishlatilgan. Bu orqali API kaliti va model nomi xavfsiz tarzda saqlanadi.
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
 
-### 6. Jupyter Notebook
-`do_embedding.ipynb` fayli orqali embedding yaratish va ma'lumotlarni sinovdan o'tkazish ishlari amalga oshirilgan. Bu loyiha uchun prototyping va ma'lumot tayyorlash bosqichi bo'ldi.
+Embedding notebook'ini ishga tushirish kerak bo'lsa, Jupyter'ni ham o'rnating:
 
-### 7. JSONL ma'lumotlar fayllari
-`plutosoft-uz-chunks.jsonl` va `plutosoft-uz-embedded.jsonl` fayllari ma'lumot bazasi uchun tayyorlangan chunklar va vektorlangan ma'lumotlarni saqlaydi.
+```bash
+python -m pip install jupyter
+```
 
-## Nima uchun bunlar kerak?
+`.env` ichidagi placeholder qiymatlarni o'zingizning kalit va sozlamalaringiz bilan almashtiring. Haqiqiy `.env` Git'ga qo'shilmaydi.
 
-- `SentenceTransformers` bo'lgani sababli savolning ma'nosi qidiriladi, oddiy string mosligidan ko'ra yaxshiroq natija keladi.
-- `ChromaDB` tufayli katta ma'lumotlar bazasi ichida tez qidiruv ishlaydi.
-- `Claude` yordamida topilgan kontekst asosida aniq, natural va foydali javob qaytariladi.
-- `dotenv` orqali API kaliti va model konfiguratsiyasi koddan ajratilib saqlanadi, xavfsizlik yaxshilanadi.
-- Local RAG arxitekturasi ma'lumotlar bazasini onlayn tashqariga chiqarmasdan ishlash imkonini beradi.
+### Environment o'zgaruvchilari
 
-## Loyihaning ishlash prinsipi
+| O'zgaruvchi | Qachon kerak | Maqsadi |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | AI ishlashi uchun | Claude API kaliti |
+| `CLAUDE_MODEL` | AI ishlashi uchun | Dastur ishga tushgandagi Claude modeli |
+| `IG_APP_ID`, `IG_APP_SECRET` | Instagram uchun | Meta app va OAuth |
+| `IG_REDIRECT_URI` | Instagram OAuth uchun | Meta sozlamasidagi callback URL |
+| `IG_WEBHOOK_VERIFY_TOKEN` | Instagram webhook uchun | Webhook tekshiruvining maxfiy tokeni |
+| `IG_ACCESS_TOKEN`, `IG_USER_ID` | Instagram OAuth'dan keyin | Ulangan Instagram akkaunt ma'lumoti; OAuth oqimi `.env` ni yangilaydi |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot va `main.py` uchun | Mijozlar bilan yozishadigan bot tokeni |
+| `TELEGRAM_BOT_TOKEN2`, `TELEGRAM_USER_ID` | Ixtiyoriy | Lead egasiga qo'shimcha Telegram xabarnomasi |
+| `DASHBOARD_PASSWORD` | Dashboard uchun | Dashboard login paroli |
+| `DASHBOARD_SECRET_KEY` | Tavsiya qilinadi | Flask sessiyalarini himoyalash uchun tasodifiy maxfiy kalit |
 
-1. `do_embedding.ipynb` orqali ma'lumotlar chunklarga bo'linadi va embeddingga aylantiriladi.
-2. Embeddinglar `chroma_db/` katalogidagi ChromaDB bazasiga saqlanadi.
-3. Foydalanuvchi savol berganda `generate_answer()` funksiyasi ishlaydi.
-4. Savol embeddingga aylantiriladi va ChromaDBdan eng mos natijalar olinadi.
-5. Ular `SYSTEM_PROMPT` bilan birga Claude modeliga yuboriladi.
-6. Model kontekst asosida javobni qaytaradi.
+Dashboard'dagi model tanlagich `claude-haiku-5-5`, `claude-sonnet-5-5` va `claude-opus-5-5` variantlaridan birini tanlashga imkon beradi. Tanlov `.env` fayliga saqlanib, ishlayotgan jarayonda darhol qo'llanadi. Joriy model ID'larini [Anthropic model ro'yxatidan](https://platform.claude.com/docs/en/models/overview) tekshirish mumkin.
 
-## Foydalanish
+## Knowledge base tayyorlash
 
-1. `.env` faylini tayyorlang yoki `.env.example` dan nusxa oling.
-2. Anthropic API kalitingizni kiriting.
-3. Loyihani ishga tushiring:
+Agent `chroma_db/` ichidagi `plutosoft_uz` ChromaDB kolleksiyasidan foydalanadi. Agar kolleksiya hali yaratilmagan yoki bo'sh bo'lsa, `do_embedding.ipynb` notebook va `plutosoft-uz-chunks.jsonl` / `plutosoft-uz-embedded.jsonl` ma'lumotlari yordamida embeddinglarni tayyorlab, kolleksiyani avval to'ldiring. Embedding modelni birinchi marta olish uchun internet aloqasi kerak.
+
+CLI rejimida agentni ishga tushirish:
 
 ```bash
 python chat_with_claude.py
 ```
 
-Agar virtual environment ishlatayotgan bo'lsangiz:
-
-```bash
-./.venv/bin/python chat_with_claude.py
-```
-
-## Instagram DM avtomatik javoblari
-
-`ig/connect_to_ig.py` Instagram Login orqali webhook qabul qiladi va Direct xabarlarga AI javobini yuboradi. Instagram akkaunt professional (Business yoki Creator) bo'lishi kerak.
-
-1. Meta Developer Dashboard'da Instagram Login va Instagram webhook'larini sozlang. Kerakli ruxsatlar kodda `SCOPES` orqali belgilanadi.
-2. `.env` ichida `IG_APP_ID`, `IG_APP_SECRET`, `IG_REDIRECT_URI` va maxfiy `IG_WEBHOOK_VERIFY_TOKEN` ni sozlang. Instagram Login OAuth sozlamasidagi redirect URL `.env` dagi `IG_REDIRECT_URI` bilan aynan bir xil bo'lsin.
-3. Flask serverni loyiha ildizidan ishga tushiring:
-
-   ```bash
-   ./.venv/bin/python ig/connect_to_ig.py
-   ```
-
-4. Serverga ommaviy HTTPS URL berish uchun ngrok kabi tunnel oching:
-
-   ```bash
-   ngrok http 5000
-   ```
-
-5. Meta Developer Dashboard > Webhooks'da Instagram obyekti uchun `https://<ngrok-domen>/instagram/webhook` callback URL va `.env` dagi `IG_WEBHOOK_VERIFY_TOKEN` ni kiriting hamda `messages` maydoniga obuna bo'ling.
-6. Brauzerda `https://<ngrok-domen>/instagram/connect` ni ochib, Instagram orqali ruxsat bering. OAuth tugagach `IG_ACCESS_TOKEN` va `IG_USER_ID` `.env` ga yoziladi va Instagram akkaunt webhook'ga obuna qilinadi.
-7. Meta ilovasi Published/Live bo'lishi yoki test rejimida xabar yuboruvchi akkaunt tester sifatida qo'shilib, taklifni qabul qilgan bo'lishi kerak. Instagram'da **Connected Tools > Allow Access to Messages** yoqilganini tekshirib, boshqa akkauntdan DM yuboring.
-
-Instagram Login orqali ishlatilayotgan API oqimida typing indicator qo'llanmaydi. Ngrok URL o'zgarsa, Meta Dashboard'dagi webhook callback va `.env` dagi `IG_REDIRECT_URI` ni yangilang.
+Suhbatdan chiqish uchun `exit` yoki `quit` yozing.
 
 ## Telegram bot
 
-`tg/connect_to_tg.py` Telegram'dan kelgan matnli xabarlarni mavjud `generate_answer()` agentiga yuboradi va javobni foydalanuvchiga qaytaradi. Bot long polling ishlatadi, shuning uchun Telegram uchun public URL yoki webhook sozlash shart emas.
-
-1. Telegram'da [@BotFather](https://t.me/BotFather) orqali bot yarating va bot tokenini oling.
-2. Tokenni loyiha ildizidagi `.env` fayliga qo'shing:
-
-   ```env
-   TELEGRAM_BOT_TOKEN=BotFather_bergan_token
-   ```
-
-3. Loyiha ildizidan botni ishga tushiring:
-
-   ```bash
-   ./.venv/bin/python tg/connect_to_tg.py
-   ```
-
-4. Telegram'da botni ochib `/start` yuboring, so'ng savolingizni yozing.
-
-Xizmat yoki narxga qiziqish bildirgan mijozdan agent ism, telefon va ixtiyoriy qo'shimcha xabarni so'raydi. To'liq ma'lumot `TELEGRAM_BOT_TOKEN2` orqali `TELEGRAM_USER_ID` ga yuboriladi. Bildirishnoma uchun alohida botni [@BotFather](https://t.me/BotFather) orqali yarating va o'zingiz ham o'sha botga kamida bir marta `/start` yuboring. `.env` da ikkala bot tokeni, `TELEGRAM_USER_ID` va `ANTHROPIC_API_KEY` sozlangan, RAG bazasi tayyor bo'lishi kerak. Javoblar 4096 belgidan uzun bo'lsa, bir nechta xabarga bo'linadi.
-
-Lead yig'ish holati xotirada saqlanadi; dastur qayta ishga tushsa tugallanmagan suhbat holati yangidan boshlanadi. Bildirishnoma yuborilmasa, agent leadni yo'qotmaydi va mijozdan `/retry` yuborib qayta urinishni so'raydi.
-
-Instagram va Telegram'ni birga ishga tushirish uchun loyiha ildizidan:
+1. Telegram'da [@BotFather](https://t.me/BotFather) orqali bot yarating.
+2. Bot tokenini `.env` dagi `TELEGRAM_BOT_TOKEN` qiymatiga kiriting.
+3. Botga Telegram'dan `/start` yuboring.
+4. Faqat Telegram xizmatini ishga tushiring:
 
 ```bash
-./.venv/bin/python main.py
+python tg/connect_to_tg.py
 ```
 
-Bu Telegram botini long polling bilan va Instagram webhook serverini `localhost:5000` da ishga tushiradi. Instagram uchun Meta webhook tunneli (masalan, ngrok) avvalgidek kerak.
+Bot long polling ishlatadi, shu sababli Telegram uchun public webhook URL talab qilinmaydi. Xizmat yoki narxga qiziqqan mijozdan agent ism, telefon va ixtiyoriy izohni so'raydi. Tugallangan lead SQLite'ga saqlanadi. `TELEGRAM_BOT_TOKEN2` va `TELEGRAM_USER_ID` to'ldirilsa, egasiga qo'shimcha Telegram bildirishnomasi yuboriladi.
 
-## Fayllar haqida qisqacha
+## Instagram Direct
 
-- `chat_with_claude.py` — asosiy chatbot logikasi
-- `ig/connect_to_ig.py` — Instagram Login, DM webhook va avtomatik javob
-- `tg/connect_to_tg.py` — Telegram bot va agent javoblari
-- `do_embedding.ipynb` — embedding yaratish va ma'lumotlarni tayyorlash
-- `plutosoft-uz-chunks.jsonl` — to'plangan ma'lumot chunklari
-- `plutosoft-uz-embedded.jsonl` — embeddinglangan ma'lumotlar
-- `chroma_db/` — lokal vektor ma'lumotlar bazasi
-- `.env` — mahfiy konfiguratsiyalar
+Meta Developer Dashboard'da Instagram Login va `messages` webhook'ini sozlang. `.env` dagi `IG_REDIRECT_URI` Meta'da kiritilgan OAuth callback bilan aynan bir xil bo'lishi kerak. Instagram Login oqimidagi API typing indicator'ni qo'llamaydi.
 
-## Muhim eslatma
+1. Loyiha ildizidan Instagram serverini ishga tushirib, OAuth'ni ulang:
 
-Bu loyiha hali MVP (minimum viable product) holatida. U CLI asosida ishlaydi va kelajakda web-frontend, admin panel, API server yoki ko'proq ma'lumotlar bazasi bilan kengaytirilishi mumkin.
+```bash
+python ig/connect_to_ig.py
+```
+
+2. Boshqa terminalda public HTTPS tunnel yarating:
+
+```bash
+ngrok http 5000
+```
+
+3. Meta Webhooks'da callback URL'ni `https://<public-domain>/instagram/webhook` va verify token'ni `.env` dagi `IG_WEBHOOK_VERIFY_TOKEN` qilib sozlang; `messages` hodisasiga obuna bo'ling.
+4. `https://<public-domain>/instagram/connect` manzilida Instagram OAuth ruxsatini yakunlang.
+
+Instagram webhook va profil ma'lumotlari Meta ilovasining ruxsatlari, app holati va akkaunt sozlamalariga bog'liq.
+
+## Barcha xizmatlar va dashboard
+
+Instagram hamda Telegram sozlamalari `.env` da mavjud bo'lganda loyiha ildizidan ishga tushiring:
+
+```bash
+python main.py
+```
+
+Dashboard lokal manzili: `http://127.0.0.1:5000/dashboard`. Public tunnel ishlatilsa, tunnel domenidagi `/dashboard` yo'liga kiring. Dashboard `DASHBOARD_PASSWORD` orqali himoyalangan. Ommaviy tarmoqqa chiqarishdan oldin kuchli, alohida parol va `DASHBOARD_SECRET_KEY` o'rnating.
+
+Dashboard imkoniyatlari:
+
+- Instagram va Telegram suhbatlarini ko'rish, qidirish va kanal bo'yicha filtrlash;
+- suhbat ichidan qo'lda matnli javob yuborish;
+- dark/light ko'rinishni almashtirish (tanlov brauzerda eslab qolinadi);
+- Claude modelini almashtirish;
+- lead ismi, telefoni, izohi va AI xulosasini ko'rish.
+
+Xabarlar va leadlar `conversation_history.sqlite3` lokal SQLite bazasida saqlanadi. Lead tugallanganda so'nggi 100 tagacha saqlangan suhbat xabari asosida Claude qisqa xulosa yaratadi. Xulosa generatsiyasi xato bersa ham lead bazaga saqlanadi, faqat xulosa bo'sh qoladi. Ixtiyoriy Telegram bildirishnomasiga xulosa ham qo'shiladi. Dashboard suhbat va lead ro'yxatlarini taxminan har 4 soniyada yangilaydi.
+
+## Loyiha fayllari
+
+- `main.py` — Instagram webhook va Telegram botini birga ishga tushiradi.
+- `chat_with_claude.py` — RAG javobi va lead suhbati xulosasini yaratadi.
+- `do_embedding.ipynb` — knowledge base uchun embedding tayyorlash notebook'i.
+- `cl/chat_store.py` — SQLite xabar, profil va lead ma'lumotlari.
+- `cl/send_leads.py` — lead yig'ish, saqlash va xabarnoma.
+- `ig/connect_to_ig.py` — Instagram OAuth, webhook va Direct xabarlari.
+- `ig/dashboard.py` — dashboard sahifasi va himoyalangan API.
+- `ig/templates/`, `ig/static/` — dashboard HTML, CSS va JavaScript.
+- `tg/connect_to_tg.py` — Telegram long-polling bot.
+- `plutosoft-uz-chunks.jsonl`, `plutosoft-uz-embedded.jsonl` — knowledge base JSONL ma'lumotlari.
+- `chroma_db/` — lokal vektor bazasi.
+- `conversation_history.sqlite3` — lokal chat tarixi va lead bazasi.
+
+## Hozirgi cheklovlar
+
+Loyiha MVP holatida: dashboard faqat matnli xabar yuboradi, rasm yoki boshqa attachment yubormaydi. Instagram profil ma'lumotlari API orqali topilmasa, dashboard ism yoki ID bilan fallback qiladi. Lead yig'ish jarayonidagi tugallanmagan sessiyalar xotirada turadi va jarayon qayta ishga tushganda saqlanib qolmaydi. Tashqi servislarning ishlashi haqiqiy credential, Meta ruxsatlari va tarmoq ulanishiga bog'liq.

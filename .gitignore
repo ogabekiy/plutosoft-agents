@@ -1,24 +1,35 @@
-.env
-.env.*
+# Secrets and local environment configuration
+.env*
 !.env.example
 
-# Virtual environment
+# Python environments and bytecode
 .venv/
 venv/
-
-# Python cache
+env/
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
+.Python
 
-# Project data / local runtime
+# Generated databases and local runtime data
 chroma_db/
 *.sqlite3
+*.sqlite3-*
 .ipynb_checkpoints/
+*.log
+
+# Test, type-checker, and build artifacts
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
 
 # IDE / OS
 .vscode/
 .idea/
 .DS_Store
-*.log

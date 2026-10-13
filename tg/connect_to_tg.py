@@ -70,7 +70,29 @@ def send_message(chat_id: int, text: str) -> None:
         telegram_api("sendMessage", {"chat_id": chat_id, "text": part})
 
 
-def handle_message(chat_id: int, sender_id: int, text: str) -> None:
+def send_and_record(
+    chat_id: int,
+    display_name: str,
+    text: str,
+) -> None:
+    send_message(chat_id, text)
+    from cl.chat_store import record_message
+
+    record_message(
+        platform="Telegram",
+        external_id=str(chat_id),
+        display_name=display_name,
+        role="assistant",
+        text=text,
+    )
+
+
+def handle_message(
+    chat_id: int,
+    sender_id: int,
+    display_name: str,
+    text: str,
+) -> None:
     if str(PROJECT_ROOT) not in sys.path:
         sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -83,7 +105,7 @@ def handle_message(chat_id: int, sender_id: int, text: str) -> None:
     )
     if handled:
         if lead_reply:
-            send_message(chat_id, lead_reply)
+            send_and_record(chat_id, display_name, lead_reply)
         return
 
     from chat_with_claude import generate_answer
@@ -91,7 +113,7 @@ def handle_message(chat_id: int, sender_id: int, text: str) -> None:
     answer = generate_answer(text)
     reply_parts = [part for part in (answer, LEAD_PROMPT if started else "") if part]
     if reply_parts:
-        send_message(chat_id, "\n\n".join(reply_parts))
+        send_and_record(chat_id, display_name, "\n\n".join(reply_parts))
 
 
 def handle_update(update: dict[str, Any]) -> None:
@@ -114,10 +136,76 @@ def handle_update(update: dict[str, Any]) -> None:
         return
 
     chat_id = chat["id"]
+    from cl.chat_store import get_profile, record_message, update_profile
+
+    cached_profile = get_profile("Telegram", str(chat_id))
+    display_name = " ".join(
+        part
+        for part in (sender.get("first_name"), sender.get("last_name"))
+        if isinstance(part, str) and part
+    )
+    if not display_name:
+        display_name = (
+            (f"@{sender['username']}" if isinstance(sender.get("username"), str) else None)
+            or (cached_profile.get("display_name") if cached_profile else None)
+            or str(sender["id"])
+        )
+
+    username = sender.get("username") or (
+        cached_profile.get("username") if cached_profile else None
+    )
+    avatar_file_id = (
+        cached_profile.get("avatar_file_id")
+        if cached_profile
+        else None
+    )
+    if not avatar_file_id:
+        try:
+            photo_result = telegram_api(
+                "getUserProfilePhotos",
+                {"user_id": sender["id"], "limit": 1},
+                timeout=15,
+            )
+            photos = photo_result.get("photos", []) if isinstance(photo_result, dict) else []
+            if photos and photos[0]:
+                photo = max(
+                    (item for item in photos[0] if isinstance(item, dict)),
+                    key=lambda item: item.get("width", 0) * item.get("height", 0),
+                    default={},
+                )
+                avatar_file_id = photo.get("file_id")
+        except (requests.RequestException, RuntimeError, ValueError):
+            logger.warning(
+                "Telegram profile photo is unavailable for user %s.",
+                sender["id"],
+                exc_info=True,
+            )
+    update_profile(
+        platform="Telegram",
+        external_id=str(chat_id),
+        display_name=display_name,
+        username=username,
+        avatar_file_id=avatar_file_id,
+    )
+
+    record_message(
+        platform="Telegram",
+        external_id=str(chat_id),
+        display_name=display_name,
+        role="customer",
+        text=text.strip(),
+        message_key=(
+            f"{chat_id}:{message['message_id']}"
+            if message.get("message_id") is not None
+            else None
+        ),
+    )
+
     command = text.split(maxsplit=1)[0].split("@", maxsplit=1)[0]
     if command in {"/start", "/help"}:
-        send_message(
+        send_and_record(
             chat_id,
+            display_name,
             "Salom! PlutoSoft AI yordamchisiga xush kelibsiz. Savolingizni yozing.",
         )
         return
@@ -126,6 +214,7 @@ def handle_update(update: dict[str, Any]) -> None:
         handle_message,
         chat_id,
         sender["id"],
+        display_name,
         text.strip(),
     ).add_done_callback(
         log_message_error

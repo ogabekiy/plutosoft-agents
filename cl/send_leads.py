@@ -3,12 +3,15 @@
 import logging
 import os
 import re
+import sqlite3
 import threading
+import uuid
 from pathlib import Path
 from typing import Any
 
 import requests
 from dotenv import load_dotenv
+from cl import chat_store
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -64,6 +67,7 @@ def send_lead(
     name: str,
     phone: str,
     note: str,
+    summary: str,
     source: str,
     source_user_id: str,
 ) -> None:
@@ -82,6 +86,7 @@ def send_lead(
         f"Ism: {name}\n"
         f"Telefon: {phone}\n"
         f"Qo'shimcha xabar: {note or 'yo‘q'}\n"
+        f"Suhbat xulosasi: {summary or 'AI xulosasi tayyorlanmadi.'}\n"
         f"Manba foydalanuvchi ID: {source_user_id}"
     )
     try:
@@ -117,7 +122,7 @@ def handle_lead_message(
         if lead is None:
             if not is_lead_intent(normalized):
                 return False, False, None
-            _lead_sessions[key] = {"stage": "name"}
+            _lead_sessions[key] = {"stage": "name", "lead_id": uuid.uuid4().hex}
             return False, True, None
 
         command = normalized.casefold()
@@ -159,14 +164,56 @@ def handle_lead_message(
         lead["stage"] = "sending"
         lead_copy = lead.copy()
 
+    summary = ""
     try:
-        send_lead(
+        conversation = chat_store.list_messages(
+            source,
+            str(source_user_id),
+            limit=100,
+        )
+        if conversation:
+            from chat_with_claude import summarize_conversation
+
+            summary = summarize_conversation(conversation)
+        else:
+            logger.warning(
+                "No conversation history found for lead %s; storing it without an AI summary.",
+                lead_copy["lead_id"],
+            )
+    except Exception:
+        logger.exception(
+            "AI summary generation failed for lead %s; saving the lead without a summary.",
+            lead_copy["lead_id"],
+        )
+
+    try:
+        notification_configured = bool(TELEGRAM_BOT_TOKEN and TELEGRAM_USER_ID)
+        chat_store.save_lead(
+            lead_id=lead_copy["lead_id"],
+            platform=source,
+            source_user_id=str(source_user_id),
             name=lead_copy["name"],
             phone=lead_copy["phone"],
             note=lead_copy["note"],
-            source=source,
-            source_user_id=str(source_user_id),
+            summary=summary,
+            notification_status="pending" if notification_configured else "not_configured",
         )
+        if notification_configured:
+            try:
+                send_lead(
+                    name=lead_copy["name"],
+                    phone=lead_copy["phone"],
+                    note=lead_copy["note"],
+                    summary=summary,
+                    source=source,
+                    source_user_id=str(source_user_id),
+                )
+            except (RuntimeError, sqlite3.Error):
+                chat_store.update_lead_notification(lead_copy["lead_id"], "failed")
+                raise
+            chat_store.update_lead_notification(lead_copy["lead_id"], "sent")
+        else:
+            logger.info("Lead %s saved without Telegram notification credentials.", lead_copy["lead_id"])
     except RuntimeError:
         with _lead_sessions_lock:
             if key in _lead_sessions:

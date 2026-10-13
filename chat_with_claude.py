@@ -212,9 +212,11 @@ def generate_answer(question: str) -> str:
         "hey"
     }
 
+    model = os.getenv("CLAUDE_MODEL", CLAUDE_MODEL)
+
     if question.casefold() in greetings:
         response = claude_client.messages.create(
-            model=CLAUDE_MODEL,
+            model=model,
             max_tokens=MAX_TOKENS,
             system=SYSTEM_PROMPT,
             messages=[
@@ -250,7 +252,7 @@ Kontekstda yo'q faktlarni o'ylab topma.
 """
 
     response = claude_client.messages.create(
-        model=CLAUDE_MODEL,
+        model=model,
         max_tokens=MAX_TOKENS,
         system=SYSTEM_PROMPT,
         messages=[
@@ -262,6 +264,42 @@ Kontekstda yo'q faktlarni o'ylab topma.
     )
 
     return extract_text(response)
+
+
+def summarize_conversation(messages: list[dict]) -> str:
+    """Create a short, factual lead summary from the saved customer/assistant chat."""
+    if not messages:
+        raise ValueError("Suhbat xulosasi uchun xabarlar topilmadi.")
+
+    transcript_lines = []
+    for message in messages[-80:]:
+        role = "Mijoz" if message["role"] == "customer" else "PlutoSoft AI"
+        text = str(message["text"]).strip()
+        if text:
+            transcript_lines.append(f"{role}: {text[:1200]}")
+
+    response = claude_client.messages.create(
+        model=os.getenv("CLAUDE_MODEL", CLAUDE_MODEL),
+        max_tokens=350,
+        system=(
+            "Sen mijozlar murojaatlarini qisqa va aniq xulosa qiluvchi yordamchisan. "
+            "Faqat suhbatda aytilgan faktlarni yoz; taxmin qilma. "
+            "O'zbek tilida 2-5 jumla yoz. Mijozning ehtiyoji, so'ragan xizmati, "
+            "muhim savollari va kelishilgan keyingi qadamni kiritsang bo'ladi. "
+            "Ism va telefon raqamini takrorlama."
+        ),
+        messages=[
+            {
+                "role": "user",
+                "content": "Quyidagi mijoz va AI suhbatini xulosa qil:\n\n"
+                + "\n".join(transcript_lines),
+            }
+        ],
+    )
+    summary = extract_text(response)
+    if not summary:
+        raise ValueError("Claude suhbat xulosasini bo'sh qaytardi.")
+    return summary[:1200]
 
 
 # ==========================================
