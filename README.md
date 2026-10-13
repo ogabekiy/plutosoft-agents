@@ -68,9 +68,66 @@ Agar virtual environment ishlatayotgan bo'lsangiz:
 ./.venv/bin/python chat_with_claude.py
 ```
 
+## Instagram DM avtomatik javoblari
+
+`ig/connect_to_ig.py` Instagram Login orqali webhook qabul qiladi va Direct xabarlarga AI javobini yuboradi. Instagram akkaunt professional (Business yoki Creator) bo'lishi kerak.
+
+1. Meta Developer Dashboard'da Instagram Login va Instagram webhook'larini sozlang. Kerakli ruxsatlar kodda `SCOPES` orqali belgilanadi.
+2. `.env` ichida `IG_APP_ID`, `IG_APP_SECRET`, `IG_REDIRECT_URI` va maxfiy `IG_WEBHOOK_VERIFY_TOKEN` ni sozlang. Instagram Login OAuth sozlamasidagi redirect URL `.env` dagi `IG_REDIRECT_URI` bilan aynan bir xil bo'lsin.
+3. Flask serverni loyiha ildizidan ishga tushiring:
+
+   ```bash
+   ./.venv/bin/python ig/connect_to_ig.py
+   ```
+
+4. Serverga ommaviy HTTPS URL berish uchun ngrok kabi tunnel oching:
+
+   ```bash
+   ngrok http 5000
+   ```
+
+5. Meta Developer Dashboard > Webhooks'da Instagram obyekti uchun `https://<ngrok-domen>/instagram/webhook` callback URL va `.env` dagi `IG_WEBHOOK_VERIFY_TOKEN` ni kiriting hamda `messages` maydoniga obuna bo'ling.
+6. Brauzerda `https://<ngrok-domen>/instagram/connect` ni ochib, Instagram orqali ruxsat bering. OAuth tugagach `IG_ACCESS_TOKEN` va `IG_USER_ID` `.env` ga yoziladi va Instagram akkaunt webhook'ga obuna qilinadi.
+7. Meta ilovasi Published/Live bo'lishi yoki test rejimida xabar yuboruvchi akkaunt tester sifatida qo'shilib, taklifni qabul qilgan bo'lishi kerak. Instagram'da **Connected Tools > Allow Access to Messages** yoqilganini tekshirib, boshqa akkauntdan DM yuboring.
+
+Instagram Login orqali ishlatilayotgan API oqimida typing indicator qo'llanmaydi. Ngrok URL o'zgarsa, Meta Dashboard'dagi webhook callback va `.env` dagi `IG_REDIRECT_URI` ni yangilang.
+
+## Telegram bot
+
+`tg/connect_to_tg.py` Telegram'dan kelgan matnli xabarlarni mavjud `generate_answer()` agentiga yuboradi va javobni foydalanuvchiga qaytaradi. Bot long polling ishlatadi, shuning uchun Telegram uchun public URL yoki webhook sozlash shart emas.
+
+1. Telegram'da [@BotFather](https://t.me/BotFather) orqali bot yarating va bot tokenini oling.
+2. Tokenni loyiha ildizidagi `.env` fayliga qo'shing:
+
+   ```env
+   TELEGRAM_BOT_TOKEN=BotFather_bergan_token
+   ```
+
+3. Loyiha ildizidan botni ishga tushiring:
+
+   ```bash
+   ./.venv/bin/python tg/connect_to_tg.py
+   ```
+
+4. Telegram'da botni ochib `/start` yuboring, so'ng savolingizni yozing.
+
+Xizmat yoki narxga qiziqish bildirgan mijozdan agent ism, telefon va ixtiyoriy qo'shimcha xabarni so'raydi. To'liq ma'lumot `TELEGRAM_BOT_TOKEN2` orqali `TELEGRAM_USER_ID` ga yuboriladi. Bildirishnoma uchun alohida botni [@BotFather](https://t.me/BotFather) orqali yarating va o'zingiz ham o'sha botga kamida bir marta `/start` yuboring. `.env` da ikkala bot tokeni, `TELEGRAM_USER_ID` va `ANTHROPIC_API_KEY` sozlangan, RAG bazasi tayyor bo'lishi kerak. Javoblar 4096 belgidan uzun bo'lsa, bir nechta xabarga bo'linadi.
+
+Lead yig'ish holati xotirada saqlanadi; dastur qayta ishga tushsa tugallanmagan suhbat holati yangidan boshlanadi. Bildirishnoma yuborilmasa, agent leadni yo'qotmaydi va mijozdan `/retry` yuborib qayta urinishni so'raydi.
+
+Instagram va Telegram'ni birga ishga tushirish uchun loyiha ildizidan:
+
+```bash
+./.venv/bin/python main.py
+```
+
+Bu Telegram botini long polling bilan va Instagram webhook serverini `localhost:5000` da ishga tushiradi. Instagram uchun Meta webhook tunneli (masalan, ngrok) avvalgidek kerak.
+
 ## Fayllar haqida qisqacha
 
 - `chat_with_claude.py` — asosiy chatbot logikasi
+- `ig/connect_to_ig.py` — Instagram Login, DM webhook va avtomatik javob
+- `tg/connect_to_tg.py` — Telegram bot va agent javoblari
 - `do_embedding.ipynb` — embedding yaratish va ma'lumotlarni tayyorlash
 - `plutosoft-uz-chunks.jsonl` — to'plangan ma'lumot chunklari
 - `plutosoft-uz-embedded.jsonl` — embeddinglangan ma'lumotlar
